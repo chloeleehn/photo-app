@@ -4,21 +4,26 @@ phases:
   install:
     runtime-versions:
       nodejs: 18
+  pre_build:
+    commands:
+      - echo Installing dependencies for LF1...
+      - cd LF1 && npm install || true && cd ..
+      - echo Installing dependencies for LF2...
+      - cd LF2 && npm install || true && cd ..
   build:
     commands:
-      - echo "Building Lambda packages"
-
-      - cd LF1
-      - npm install
-      - zip -r ../LF1.zip .
-      - cd ..
-
-      - cd LF2
-      - npm install
-      - zip -r ../LF2.zip .
-      - cd ..
+      - echo Building Lambda packages...
+      - cd LF1 && zip -r ../lf1.zip . && cd ..
+      - cd LF2 && zip -r ../lf2.zip . && cd ..
+  post_build:
+    commands:
+      - echo Deploying Lambda functions...
+      - aws lambda update-function-code --function-name LF1 --zip-file fileb://lf1.zip
+      - echo LF1 deployed
+      - aws lambda update-function-code --function-name LF2 --zip-file fileb://lf2.zip
+      - echo LF2 deployed
 
 artifacts:
   files:
-    - LF1.zip
-    - LF2.zip
+    - lf1.zip
+    - lf2.zip

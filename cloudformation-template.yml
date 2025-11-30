@@ -1,57 +1,72 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Photo Album Infrastructure Stack"
+Description: "Photo Album Infrastructure V2 - Duplicate Resources for Testing"
 
 Resources:
-  # S3 BUCKET — FRONTEND (HOSTED WEBSITE)
-  FrontendBucket:
+  # ============================================================
+  # S3 BUCKETS (Version 2 - no conflict)
+  # ============================================================
+
+  FrontendBucketV2:
     Type: AWS::S3::Bucket
     Properties:
+      BucketName: !Sub "${AWS::StackName}-frontend-v2"
       WebsiteConfiguration:
         IndexDocument: index.html
+        ErrorDocument: error.html
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
         IgnorePublicAcls: false
         RestrictPublicBuckets: false
 
-  FrontendBucketPolicy:
+  FrontendBucketPolicyV2:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref FrontendBucket
+      Bucket: !Ref FrontendBucketV2
       PolicyDocument:
         Statement:
-          - Sid: PublicRead
+          - Sid: AllowPublicRead
             Effect: Allow
             Principal: "*"
             Action: s3:GetObject
-            Resource: !Sub "${FrontendBucket.Arn}/*"
+            Resource: !Sub "${FrontendBucketV2.Arn}/*"
 
-  # S3 BUCKET — STORAGE
-  StorageBucket:
+  StorageBucketV2:
     Type: AWS::S3::Bucket
     Properties:
+      BucketName: !Sub "${AWS::StackName}-storage-v2"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
         IgnorePublicAcls: false
         RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: ["GET", "PUT", "POST", "DELETE"]
+            AllowedOrigins: ["*"]
+            MaxAge: 3000
 
-  StorageBucketPolicy:
+  StorageBucketPolicyV2:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref StorageBucket
+      Bucket: !Ref StorageBucketV2
       PolicyDocument:
         Statement:
-          - Sid: PublicRead
+          - Sid: PublicReadGetObject
             Effect: Allow
             Principal: "*"
             Action: s3:GetObject
-            Resource: !Sub "${StorageBucket.Arn}/*"
+            Resource: !Sub "${StorageBucketV2.Arn}/*"
 
-  # LAMBDA ROLE
-  LambdaRole:
+  # ============================================================
+  # IAM ROLE (shared by both Lambda V2 functions)
+  # ============================================================
+
+  LambdaExecutionRoleV2:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub "${AWS::StackName}-lambda-role-v2"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -61,187 +76,123 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-        - arn:aws:iam::aws:policy/AmazonS3FullAccess
-        - arn:aws:iam::aws:policy/AmazonRekognitionFullAccess
+      Policies:
+        - PolicyName: S3AccessV2
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "${StorageBucketV2.Arn}"
+                  - !Sub "${StorageBucketV2.Arn}/*"
+        - PolicyName: RekognitionAccessV2
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - rekognition:DetectLabels
+                  - rekognition:DetectFaces
+                Resource: "*"
 
-  # LAMBDA FUNCTIONS (LF1 + LF2)
-  Lambda1:
+  # ============================================================
+  # LAMBDA FUNCTIONS (Version 2)
+  # ============================================================
+
+  LF1IndexPhotosV2:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: LF1
-      Handler: index.handler
-      Runtime: nodejs18.x
-      Role: !GetAtt LambdaRole.Arn
+      FunctionName: !Sub "${AWS::StackName}-LF1-IndexPhotos-V2"
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleV2.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          STORAGE_BUCKET: !Ref StorageBucketV2
       Code:
         ZipFile: |
-          exports.handler = async () => {
-            return { statusCode: 200, body: "LF1 CF OK" };
-          };
+          # (same LF1 code as before)
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "LF1 V2 placeholder"}
 
-  Lambda2:
+  LF2SearchPhotosV2:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: LF2
-      Handler: index.handler
-      Runtime: nodejs18.x
-      Role: !GetAtt LambdaRole.Arn
+      FunctionName: !Sub "${AWS::StackName}-LF2-SearchPhotos-V2"
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleV2.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          STORAGE_BUCKET: !Ref StorageBucketV2
       Code:
         ZipFile: |
-          exports.handler = async () => {
-            return { statusCode: 200, body: "LF2 CF OK" };
-          };
+          # (same LF2 code as before)
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "LF2 V2 placeholder"}
 
-  # LAMBDA PERMISSIONS FOR API GATEWAY
-  Lambda1Permission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref Lambda1
-      Action: lambda:InvokeFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/*"
+  # ============================================================
+  # API GATEWAY (Version 2)
+  # ============================================================
 
-  Lambda2Permission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref Lambda2
-      Action: lambda:InvokeFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/*"
-
-  # API GATEWAY
-  ApiGateway:
+  ApiGatewayV2:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: PhotoAPI
-      BinaryMediaTypes:
-        - "image/jpeg"
-        - "image/png"
-        - "*/*"
+      Name: !Sub "${AWS::StackName}-PhotoAlbumAPI-V2"
 
-  # /upload RESOURCE
-  ApiResourceUpload:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref ApiGateway
-      ParentId: !GetAtt ApiGateway.RootResourceId
-      PathPart: upload
-
-  # /upload/{bucket} RESOURCE
-  ApiResourceBucket:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref ApiGateway
-      ParentId: !Ref ApiResourceUpload
-      PathPart: "{bucket}"
-
-  # /upload/{bucket}/{filename} RESOURCE
-  ApiResourceFilename:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref ApiGateway
-      ParentId: !Ref ApiResourceBucket
-      PathPart: "{filename}"
-
-  # PUT METHOD FOR UPLOAD
-  ApiUploadPutMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref ApiGateway
-      ResourceId: !Ref ApiResourceFilename
-      HttpMethod: PUT
-      AuthorizationType: NONE
-      RequestParameters:
-        method.request.path.bucket: true
-        method.request.path.filename: true
-        method.request.header.Content-Type: false
-        method.request.header.x-amz-meta-customLabels: false
-      Integration:
-        Type: AWS
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Lambda1.Arn}/invocations"
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
-
-  # GET METHOD FOR /upload
-  ApiUploadGetMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref ApiGateway
-      ResourceId: !Ref ApiResourceUpload
-      HttpMethod: GET
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Lambda2.Arn}/invocations"
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
-
-  # OPTIONS METHOD FOR CORS (PUT)
-  ApiUploadOptionsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref ApiGateway
-      ResourceId: !Ref ApiResourceFilename
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-amz-meta-customLabels'"
-              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,PUT'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-
-  # API DEPLOYMENT
-  ApiDeployment:
+  ApiDeploymentV2:
     Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - ApiUploadPutMethod
-      - ApiUploadGetMethod
-      - ApiUploadOptionsMethod
+    DependsOn: []
     Properties:
-      RestApiId: !Ref ApiGateway
+      RestApiId: !Ref ApiGatewayV2
       StageName: dev
 
+  # ============================================================
+  # PERMISSIONS
+  # ============================================================
+
+  LambdaPermissionLF1V2:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LF1IndexPhotosV2
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayV2}/*/*/*"
+
+  LambdaPermissionLF2V2:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LF2SearchPhotosV2
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayV2}/*/*/*"
+
+# ============================================================
+# OUTPUTS
+# ============================================================
+
 Outputs:
-  FrontendURL:
-    Description: "Public Website URL"
-    Value: !Sub "http://${FrontendBucket}.s3-website-${AWS::Region}.amazonaws.com"
+  FrontendBucketV2Name:
+    Value: !Ref FrontendBucketV2
 
-  StorageBucketName:
-    Description: "Storage Bucket Name"
-    Value: !Ref StorageBucket
+  FrontendWebsiteV2URL:
+    Value: !GetAtt FrontendBucketV2.WebsiteURL
 
-  ApiEndpoint:
-    Description: "API Gateway Endpoint"
-    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/dev"
+  StorageBucketV2Name:
+    Value: !Ref StorageBucketV2
 
-  Lambda1Name:
-    Description: "Lambda Function 1 Name"
-    Value: !Ref Lambda1
+  ApiV2URL:
+    Value: !Sub "https://${ApiGatewayV2}.execute-api.${AWS::Region}.amazonaws.com/dev"
 
-  Lambda2Name:
-    Description: "Lambda Function 2 Name"
-    Value: !Ref Lambda2
+  LF1V2Name:
+    Value: !Ref LF1IndexPhotosV2
+
+  LF2V2Name:
+    Value: !Ref LF2SearchPhotosV2
