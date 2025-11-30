@@ -1,0 +1,24 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+  build:
+    commands:
+      - echo "Building Lambda packages"
+
+      - cd LF1
+      - npm install
+      - zip -r ../LF1.zip .
+      - cd ..
+
+      - cd LF2
+      - npm install
+      - zip -r ../LF2.zip .
+      - cd ..
+
+artifacts:
+  files:
+    - LF1.zip
+    - LF2.zip
