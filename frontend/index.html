@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Photo Search</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* center horizontally */
+        justify-content: flex-start;
+        min-height: 100vh;
+        background-color: #f9f9f9;
+      }
+
+      h1 {
+        font-size: 3em;
+        margin: 40px 0 20px 0;
+        text-align: center;
+      }
+
+      h3 {
+        font-size: 2em;
+        margin: 30px 0 10px 0;
+        text-align: center;
+      }
+
+      .search-container,
+      .upload-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 20px 0;
+      }
+
+      .search-container input,
+      .upload-container input {
+        font-size: 1.5em;
+        padding: 10px;
+        margin: 10px 0;
+        width: 400px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+      }
+
+      .search-container button,
+      .upload-container button {
+        font-size: 1.5em;
+        padding: 12px 25px;
+        margin-top: 10px;
+        border-radius: 8px;
+        border: none;
+        background-color: #0078d7;
+        color: white;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+
+      .search-container button:hover,
+      .upload-container button:hover {
+        background-color: #005ea6;
+      }
+
+      #results {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 20px;
+      }
+
+      #results img {
+        max-width: 300px; /* larger */
+        margin: 10px;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Photo Album Search</h1>
+
+    <div class="search-container">
+      <input id="q" placeholder="Search (e.g. tree or 'cat and dog')" />
+      <button id="searchBtn">Search</button>
+    </div>
+
+    <div class="upload-container">
+      <input id="fileInput" type="file" accept="image/*" />
+      <input id="customLabels" placeholder="Custom labels (comma separated)" />
+      <button id="uploadBtn">Upload</button>
+    </div>
+
+    <h3>Results</h3>
+    <div id="results"></div>
+
+    <script>
+      const API_BASE =
+        "https://sp84xtboqi.execute-api.us-east-1.amazonaws.com/dev";
+      const BUCKET_NAME = "storage-b2";
+
+      // SEARCH FUNCTION
+      async function search(q) {
+        if (!q.trim()) return { results: [] };
+
+        const url = `${API_BASE}/search?q=${encodeURIComponent(q)}`;
+        try {
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error(resp.statusText);
+          return await resp.json();
+        } catch (err) {
+          console.error("Search failed:", err);
+          alert("Search failed: " + err.message);
+          return { results: [] };
+        }
+      }
+
+      document.getElementById("searchBtn").onclick = async () => {
+        const queryInput = document.getElementById("q");
+        const q = queryInput.value.trim();
+        const container = document.getElementById("results");
+
+        if (!q) {
+          alert("Please enter a search term");
+          return;
+        }
+
+        container.innerHTML = "<p>Loading...</p>";
+
+        const data = await search(q);
+        const results = data.results || [];
+
+        container.innerHTML = "";
+        if (!results.length) {
+          container.innerHTML = "<p>No results found.</p>";
+          return;
+        }
+
+        results.forEach((r) => {
+          const img = document.createElement("img");
+          img.src = `https://${r.bucket}.s3.amazonaws.com/${encodeURIComponent(
+            r.objectKey
+          )}`;
+          container.appendChild(img);
+        });
+      };
+
+      // UPLOAD FUNCTION
+      document.getElementById("uploadBtn").onclick = async () => {
+        const fileEl = document.getElementById("fileInput");
+        if (!fileEl.files.length)
+          return alert("Please choose a file to upload");
+
+        const file = fileEl.files[0];
+        const customLabels = document
+          .getElementById("customLabels")
+          .value.trim();
+        const key = file.name;
+
+        const url = `${API_BASE}/upload/${BUCKET_NAME}/${encodeURIComponent(
+          key
+        )}`;
+        const headers = {
+          "Content-Type": file.type,
+        };
+        if (customLabels) headers["x-amz-meta-customLabels"] = customLabels;
+
+        try {
+          const resp = await fetch(url, { method: "PUT", headers, body: file });
+          if (!resp.ok) throw new Error(resp.statusText);
+          alert("Upload successful!");
+          // Optionally clear input fields
+          fileEl.value = "";
+          document.getElementById("customLabels").value = "";
+        } catch (err) {
+          console.error("Upload failed:", err);
+          alert("Upload failed: " + err.message);
+        }
+      };
+    </script>
+  </body>
+</html>
