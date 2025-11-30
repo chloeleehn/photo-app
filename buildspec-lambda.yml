@@ -7,22 +7,28 @@ phases:
   pre_build:
     commands:
       - echo Installing dependencies for LF1...
-      - cd LF1 && npm install || true && cd ..
+      - cd LF1
+      - npm install || true
+      - cd ..
       - echo Installing dependencies for LF2...
-      - cd LF2 && npm install || true && cd ..
+      - cd LF2
+      - npm install || true
+      - cd ..
   build:
     commands:
       - echo Building Lambda packages...
-      - cd LF1 && zip -r ../lf1.zip . && cd ..
-      - cd LF2 && zip -r ../lf2.zip . && cd ..
+      - cd LF1
+      - zip -r ../lf1.zip .
+      - cd ../LF2
+      - zip -r ../lf2.zip .
+      - cd ..
   post_build:
     commands:
-      - echo Deploying Lambda functions...
-      - aws lambda update-function-code --function-name LF1 --zip-file fileb://lf1.zip
-      - echo LF1 deployed
-      - aws lambda update-function-code --function-name LF2 --zip-file fileb://lf2.zip
-      - echo LF2 deployed
-
+      - echo Deploying to Lambda functions...
+      - aws lambda update-function-code --function-name index-photos-LF1 --zip-file fileb://lf1.zip
+      - echo index-photos-LF1 deployed successfully
+      - aws lambda update-function-code --function-name search-photo-LF2 --zip-file fileb://lf2.zip
+      - echo search-photo-LF2 deployed successfully
 artifacts:
   files:
     - lf1.zip
