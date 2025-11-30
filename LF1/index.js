@@ -3,7 +3,7 @@ const { RekognitionClient, DetectLabelsCommand } = require("@aws-sdk/client-reko
 const { Client } = require("@opensearch-project/opensearch");
 
 const s3 = new S3Client({});
-const rek = new RekognitionClient({});
+const rek = new RekognitionClient({region: "us-east-1"});
 
 //OpenSearch BASIC AUTH CLIENT
 const osClient = new Client({

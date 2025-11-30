@@ -1,10 +1,15 @@
 version: 0.2
 
 phases:
+  install:
+    runtime-versions:
+      nodejs: 18
   build:
     commands:
-      - echo "Building frontend"
+      - echo "No build needed for static frontend"
+      - ls -la frontend/
 
 artifacts:
   files:
-    - frontend/**/*
+    - "**/*"
+  base-directory: "frontend"
