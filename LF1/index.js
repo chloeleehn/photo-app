@@ -1,3 +1,4 @@
+// Test Auto-Trigger
 const { S3Client, HeadObjectCommand } = require("@aws-sdk/client-s3");
 const { RekognitionClient, DetectLabelsCommand } = require("@aws-sdk/client-rekognition");
 const { Client } = require("@opensearch-project/opensearch");

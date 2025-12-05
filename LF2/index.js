@@ -3,7 +3,7 @@
  * Input: free text query ("cats and dogs")
  * Uses Lex to extract keywords, queries OpenSearch index "photos".
  */
-
+// Test Auto-Trigger
 const { Client } = require("@opensearch-project/opensearch");
 const { LexRuntimeV2Client, RecognizeTextCommand } = require("@aws-sdk/client-lex-runtime-v2");
 
